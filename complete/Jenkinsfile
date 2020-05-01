@@ -168,12 +168,12 @@ spec:
               retry(3) {
 
               sh '''#!/busybox/sh
-              /kaniko/executor --whitelist-var-run --context `pwd` --destination ${QUAY_DOCKER_TAG}
-              '''
-
-              sh '''#!/busybox/sh
               /kaniko/executor --whitelist-var-run --context `pwd` --destination ${DEVCLOUD_DOCKER_TAG}
               '''
+//              sh '''#!/busybox/sh
+//              /kaniko/executor --whitelist-var-run --context `pwd` --destination ${QUAY_DOCKER_TAG}
+//              '''
+
             }
           }
         }
