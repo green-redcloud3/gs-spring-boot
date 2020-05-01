@@ -112,7 +112,54 @@ spec:
   }
 
   stages {
- 
+    stage('Build') {
+      steps {
+        updateGitlabCommitStatus name: 'build', state: 'pending'
+        container('maven') {
+          sh 'env; pwd;ls -al'
+	  checkout changelog: false, poll: false, scm: [$class: 'GitSCM', branches: [[name: '*/master']], doGenerateSubmoduleConfigurations: false, extensions: [], submoduleCfg: [], userRemoteConfigs: [[credentialsId: 'green-redcloud3-token', url: "${GITHUB_PROJECT_URL}.git"]]] 
+          dir('complete') {
+            sh 'ls -al'
+            sh 'mvn compile'
+          }
+        }
+        mattermostSend channel: "${MATTERMOST_CHANNEL}", endpoint: "${MATTERMOST_WEBHOOK}", message: "Job: ${JOB_NAME} \nStage: ${STAGE_NAME}\nBuild: ${BUILD_URL}\nCommit: ${GITHUB_PROJECT_URL}"
+      }
+    }
+    stage('Test') {
+      steps {
+        container('maven') {
+          dir('complete') {
+            sh 'ls -al'
+            sh 'mvn test'
+          }
+        }
+        mattermostSend channel: "${MATTERMOST_CHANNEL}", endpoint: "${MATTERMOST_WEBHOOK}", message: "Job: ${JOB_NAME} \nStage: ${STAGE_NAME}\nBuild: ${BUILD_URL}\nCommit: ${GITHUB_PROJECT_URL}"
+      }
+    }
+    stage('SAST') {
+      steps {
+        container('maven') {
+          dir('complete') {
+            withSonarQubeEnv('sonarqube') { 
+            sh "mvn compile && mvn sonar:sonar -Dsonar.projectKey=${GITHUB_GROUP}-${GITHUB_PROJECT}-${BRANCH_NAME} -Dsonar.projectName=${GITHUB_GROUP}-${GITHUB_PROJECT}-${BRANCH_NAME}"
+            }
+          }
+        }
+        mattermostSend channel: "${MATTERMOST_CHANNEL}", endpoint: "${MATTERMOST_WEBHOOK}", message: "Job: ${JOB_NAME} \nStage: ${STAGE_NAME}\nBuild: ${BUILD_URL}\nCommit: ${GITHUB_PROJECT_URL}\nStatic Application Security Test: ${SONARQUBE_URL}/dashboard?id=${GITHUB_GROUP}-${GITHUB_PROJECT}"
+      }
+    }
+    stage('SAST Quality Gate') {
+      steps {
+        container('maven') {
+          sh "date"
+//          timeout(time: 10, unit: 'MINUTES') {
+//              waitForQualityGate abortPipeline: true
+//            }
+        }
+        mattermostSend channel: "${MATTERMOST_CHANNEL}", endpoint: "${MATTERMOST_WEBHOOK}", message: "Job: ${JOB_NAME} \nStage: ${STAGE_NAME}\nBuild: ${BUILD_URL}\nCommit: ${GITHUB_PROJECT_URL}\nQuality Gate: ${SONARQUBE_URL}/dashboard?id=${GITHUB_GROUP}-${GITHUB_PROJECT}"
+      }
+    }    
     stage('Package') {
       steps {
         container(name: 'kaniko', shell: '/busybox/sh') {
